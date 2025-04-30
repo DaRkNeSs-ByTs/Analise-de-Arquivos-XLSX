@@ -1,0 +1,1511 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Painel de Segurança de Endpoints</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.23/jspdf.plugin.autotable.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --primary-color: #1e40af;
+      --secondary-color: #2563eb;
+      --accent-color: #dc2626;
+      --background-color: #f9fafb;
+      --card-background: #ffffff;
+      --text-color: #1f2937;
+      --text-secondary: #4b5563;
+      --border-color: #e5e7eb;
+      --shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+      --shadow-hover: 0 6px 16px rgba(0, 0, 0, 0.12);
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background-color: var(--background-color);
+      color: var(--text-color);
+      padding: 32px;
+      line-height: 1.6;
+    }
+
+    .container {
+      max-width: 1400px;
+      margin: 0 auto;
+      background: var(--card-background);
+      padding: 32px;
+      border-radius: 16px;
+      box-shadow: var(--shadow);
+    }
+
+    h1 {
+      font-size: 2.25rem;
+      font-weight: 700;
+      color: var(--primary-color);
+      margin-bottom: 32px;
+      text-align: center;
+    }
+
+    h3 {
+      font-size: 1.25rem;
+      font-weight: 600;
+      color: var(--text-color);
+      margin-bottom: 16px;
+    }
+
+    .file-input {
+      background: var(--card-background);
+      border: 2px dashed var(--border-color);
+      padding: 24px;
+      border-radius: 12px;
+      text-align: center;
+      margin-bottom: 32px;
+      transition: all 0.3s ease;
+    }
+
+    .file-input:hover,
+    .file-input.dragover {
+      border-color: var(--secondary-color);
+      background: #f1f5f9;
+    }
+
+    .file-input label {
+      font-size: 1.1rem;
+      font-weight: 500;
+      color: var(--text-secondary);
+      margin-bottom: 12px;
+      display: block;
+    }
+
+    .file-input input {
+      display: block;
+      margin: 0 auto;
+      font-size: 1rem;
+      padding: 8px;
+      border-radius: 8px;
+      border: 1px solid var(--border-color);
+      transition: border-color 0.3s ease;
+    }
+
+    .file-input input:hover {
+      border-color: var(--secondary-color);
+    }
+
+    .summary {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 24px;
+      margin-bottom: 40px;
+    }
+
+    .summary-card {
+      background: var(--card-background);
+      padding: 20px;
+      border-radius: 12px;
+      text-align: center;
+      box-shadow: var(--shadow);
+      transition: transform 0.3s ease, box-shadow 0.3s ease;
+    }
+
+    .summary-card:hover {
+      transform: translateY(-4px);
+      box-shadow: var(--shadow-hover);
+    }
+
+    .summary-card h3 {
+      font-size: 1rem;
+      font-weight: 500;
+      color: var(--text-secondary);
+      margin-bottom: 8px;
+    }
+
+    .summary-card p {
+      font-size: 1.75rem;
+      font-weight: 700;
+      color: var(--secondary-color);
+    }
+
+    .charts {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      gap: 32px;
+      margin-bottom: 40px;
+    }
+
+    .chart {
+      background: var(--card-background);
+      padding: 24px;
+      border-radius: 12px;
+      box-shadow: var(--shadow);
+      transition: box-shadow 0.3s ease;
+    }
+
+    .chart:hover {
+      box-shadow: var(--shadow-hover);
+    }
+
+    .table-container {
+      margin-bottom: 40px;
+      background: var(--card-background);
+      padding: 24px;
+      border-radius: 12px;
+      box-shadow: var(--shadow);
+    }
+
+    .table-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+      gap: 16px;
+    }
+
+    .group-filter select {
+      padding: 10px 16px;
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      font-size: 1rem;
+      color: var(--text-color);
+      background: #ffffff;
+      transition: border-color 0.3s ease, box-shadow 0.3s ease;
+    }
+
+    .group-filter select:hover,
+    .group-filter select:focus {
+      border-color: var(--secondary-color);
+      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+      outline: none;
+    }
+
+    .export-btn,
+    .page-btn {
+      padding: 10px 20px;
+      background: linear-gradient(135deg, var(--secondary-color), #3b82f6);
+      color: #ffffff;
+      border: none;
+      border-radius: 8px;
+      font-size: 1rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: transform 0.2s ease, box-shadow 0.3s ease, background 0.3s ease;
+      box-shadow: 0 2px 8px rgba(37, 99, 235, 0.2);
+    }
+
+    .export-btn:hover,
+    .page-btn:hover {
+      background: linear-gradient(135deg, #1e40af, var(--secondary-color));
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+    }
+
+    .page-btn.disabled {
+      background: #d1d5db;
+      cursor: not-allowed;
+      box-shadow: none;
+      transform: none;
+    }
+
+    .page-btn.active {
+      background: var(--primary-color);
+      font-weight: 600;
+      box-shadow: 0 2px 8px rgba(30, 64, 175, 0.3);
+    }
+
+    .pagination {
+      display: flex;
+      justify-content: center;
+      gap: 8px;
+      margin-top: 20px;
+      flex-wrap: wrap;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: separate;
+      border-spacing: 0;
+      border: 1px solid var(--border-color);
+      border-radius: 10px;
+      overflow: hidden;
+    }
+
+    th,
+    td {
+      padding: 14px 16px;
+      text-align: left;
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    th {
+      background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+      color: #ffffff;
+      font-weight: 600;
+      cursor: pointer;
+      user-select: none;
+      text-transform: uppercase;
+      font-size: 0.9rem;
+      letter-spacing: 0.5px;
+    }
+
+    th:hover {
+      background: linear-gradient(135deg, #1e3a8a, #2563eb);
+    }
+
+    tr:last-child td {
+      border-bottom: none;
+    }
+
+    tr:nth-child(even) {
+      background: #f8fafc;
+    }
+
+    tr:hover {
+      background: #f1f5f9;
+      transition: background 0.2s ease;
+    }
+
+    #riskTable tr.critical,
+    #interestingTable tr {
+      background: #fef2f2;
+    }
+
+    #riskTable tr.critical:hover,
+    #interestingTable tr:hover {
+      background: #fee2e2;
+      transition: background 0.2s ease;
+    }
+
+    .loading,
+    .error {
+      text-align: center;
+      font-size: 1.2rem;
+      padding: 32px;
+      font-weight: 500;
+    }
+
+    .loading {
+      color: var(--text-secondary);
+    }
+
+    .error {
+      color: var(--accent-color);
+    }
+
+    .chart-tooltip {
+      background: rgba(31, 41, 55, 0.95);
+      color: #ffffff;
+      padding: 8px;
+      border-radius: 6px;
+      font-size: 12px;
+      max-width: 300px;
+      white-space: pre-wrap;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    }
+
+    @media (max-width: 768px) {
+      body {
+        padding: 16px;
+      }
+
+      .container {
+        padding: 20px;
+      }
+
+      .summary {
+        grid-template-columns: 1fr;
+      }
+
+      .charts {
+        grid-template-columns: 1fr;
+      }
+
+      .table-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 12px;
+      }
+
+      .table-container {
+        padding: 16px;
+      }
+
+      th,
+      td {
+        padding: 10px;
+        font-size: 0.9rem;
+      }
+
+      .export-btn,
+      .page-btn {
+        padding: 8px 16px;
+        font-size: 0.9rem;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="container">
+    <h1>Painel de Segurança de Endpoints</h1>
+    <div class="file-input" id="fileInput">
+      <label>Carregar Arquivo de Endpoints (XLSX)</label>
+      <input type="file" id="fileInputElement" accept=".xlsx" />
+    </div>
+    <div id="loading" class="loading">Por favor, carregue um arquivo XLSX...</div>
+    <div id="error" class="error" style="display: none;"></div>
+    <div id="dashboard" style="display: none;">
+      <div class="summary">
+        <div class="summary-card">
+          <h3>Total de Endpoints</h3>
+          <p id="total-endpoints">0</p>
+        </div>
+        <div class="summary-card">
+          <h3>Conectados</h3>
+          <p id="connected">0</p>
+        </div>
+        <div class="summary-card">
+          <h3>CVEs Críticos</h3>
+          <p id="critical-cves">0</p>
+        </div>
+        <div class="summary-card">
+          <h3>SO Desatualizado</h3>
+          <p id="outdated-os">0</p>
+        </div>
+      </div>
+      <div class="charts">
+        <div class="chart">
+          <h3>CVEs por Gravidade</h3>
+          <canvas id="cveChart"></canvas>
+        </div>
+        <div class="chart">
+          <h3>Status de Proteção</h3>
+          <canvas id="protectionChart"></canvas>
+        </div>
+        <div class="chart">
+          <h3>Status de Conexão</h3>
+          <canvas id="connectionChart"></canvas>
+        </div>
+      </div>
+      <div class="table-container">
+        <div class="table-header">
+          <h3>Detalhes dos Endpoints</h3>
+          <div class="group-filter">
+            <select id="groupFilter">
+              <option value="all">Todos os Grupos</option>
+            </select>
+          </div>
+          <button class="export-btn" id="exportBtn">Exportar Tabela como PDF</button>
+        </div>
+        <table id="endpointTable">
+          <thead>
+            <tr>
+              <th data-sort="Endpoint">Endpoint</th>
+              <th data-sort="Group">Grupo</th>
+              <th data-sort="Protection_status">Status de Proteção</th>
+              <th data-sort="CVEs.critical">CVEs Críticos</th>
+              <th data-sort="CVEs.high">CVEs Altos</th>
+              <th data-sort="OS_version">Versão do SO</th>
+              <th data-sort="Available_patches">Patches</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+        <div class="pagination" id="endpointPagination"></div>
+      </div>
+      <div class="table-container">
+        <div class="table-header">
+          <h3>Fatos Interessantes</h3>
+          <div class="group-filter">
+            <select id="interestingGroupFilter">
+              <option value="all">Todos os Grupos</option>
+            </select>
+          </div>
+        </div>
+        <table id="interestingTable">
+          <thead>
+            <tr>
+              <th data-sort="Endpoint">Endpoint</th>
+              <th data-sort="Group">Grupo</th>
+              <th data-sort="CVEs.critical">CVEs Críticos</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+        <div class="pagination" id="interestingPagination"></div>
+      </div>
+      <div class="table-container">
+        <div class "table-header">
+          <h3>Principais Riscos</h3>
+          <div class="group-filter">
+            <select id="riskGroupFilter">
+              <option value="all">Todos os Grupos</option>
+            </select>
+          </div>
+        </div>
+        <table id="riskTable">
+          <thead>
+            <tr>
+              <th data-sort="Endpoint">Endpoint</th>
+              <th data-sort="Group">Grupo</th>
+              <th data-sort="CVEs.critical">CVEs Críticos</th>
+              <th data-sort="OS_version">Versão do SO</th>
+              <th data-sort="reason">Motivo</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+        <div class="pagination" id="riskPagination"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Parsing and cleaning CVE string
+    function parseCVEs(cveString) {
+      if (!cveString || typeof cveString !== 'string') {
+        return { critical: 0, high: 0, medium: 0, low: 0, unknown: 0 };
+      }
+      const cveObj = { critical: 0, high: 0, medium: 0, low: 0, unknown: 0 };
+      const pairs = cveString.split(',').map(pair => pair.trim().split(':'));
+      pairs.forEach(([key, value]) => {
+        if (key && value && !isNaN(value)) {
+          cveObj[key.trim()] = parseInt(value.trim(), 10);
+        }
+      });
+      console.log('Parsed CVEs:', cveString, '->', cveObj);
+      return cveObj;
+    }
+
+    // Processing and cleaning data for XLSX
+    function processData(rawData) {
+      const processed = rawData
+        .filter(row => Object.keys(row).length > 0 && Object.values(row).some(val => val !== '' && val !== null && val !== undefined))
+        .map(row => {
+          const normalizedRow = {};
+          Object.keys(row).forEach(key => {
+            const normalizedKey = key.trim().replace(/^"|"$/g, '');
+            normalizedRow[normalizedKey] = typeof row[key] === 'string' ? row[key].trim().replace(/^"|"$/g, '') : row[key];
+          });
+
+          // Map Protection_status to expected labels
+          const protectionStatusMap = {
+            'protected': 'protected',
+            'scan_only': 'scan_only',
+            'unprotected': 'unprotected',
+            'pending': 'pending',
+            'desconhecido': 'unprotected', // Default mapping for unknown values
+          };
+          const rawProtectionStatus = normalizedRow['Protection status'] || 'desconhecido';
+          const mappedProtectionStatus = protectionStatusMap[rawProtectionStatus.toLowerCase()] || 'unprotected';
+
+          const processedRow = {
+            Endpoint: normalizedRow.Endpoint || 'desconhecido',
+            Connection: normalizedRow.Connection === 'true' ? true : normalizedRow.Connection === 'false' ? false : false,
+            Group: normalizedRow.Group || 'desconhecido',
+            Protection_status: mappedProtectionStatus,
+            CVEs: parseCVEs(normalizedRow['CVEs by severity']),
+            OS_version: normalizedRow['OS version'] || 'desconhecido',
+            OS_release_name: normalizedRow['OS release name'] || 'desconhecido',
+            Available_patches: !isNaN(parseInt(normalizedRow['Available patches'], 10)) ? parseInt(normalizedRow['Available patches'], 10) : 0,
+          };
+
+          console.log('Processed Row for Charts:', {
+            Endpoint: processedRow.Endpoint,
+            Connection: processedRow.Connection,
+            Protection_status: processedRow.Protection_status,
+            CVEs: processedRow.CVEs,
+          });
+
+          return processedRow;
+        });
+
+      console.log('Processed Data:', processed);
+      return processed;
+    }
+
+    // Aggregating CVE data
+    function aggregateCVEs(data) {
+      const totals = { critical: 0, high: 0, medium: 0, low: 0 };
+      data.forEach(row => {
+        totals.critical += row.CVEs.critical || 0;
+        totals.high += row.CVEs.high || 0;
+        totals.medium += row.CVEs.medium || 0;
+        totals.low += row.CVEs.low || 0;
+      });
+      const cveData = [
+        { label: 'Crítico', value: totals.critical, key: 'critical' },
+        { label: 'Alto', value: totals.high, key: 'high' },
+        { label: 'Médio', value: totals.medium, key: 'medium' },
+        { label: 'Baixo', value: totals.low, key: 'low' },
+      ];
+      console.log('Aggregated CVEs for Chart:', cveData);
+      return cveData;
+    }
+
+    // Counting protection status
+    function protectionStatusCounts(data) {
+      const counts = { protected: 0, scan_only: 0, unprotected: 0, pending: 0 };
+      data.forEach(row => {
+        const status = row.Protection_status || 'unprotected';
+        counts[status] = (counts[status] || 0) + 1;
+      });
+      const protectionData = [
+        { label: 'protected', value: counts.protected, key: 'protected' },
+        { label: 'scan_only', value: counts.scan_only, key: 'scan_only' },
+        { label: 'unprotected', value: counts.unprotected, key: 'unprotected' },
+        { label: 'pending', value: counts.pending, key: 'pending' },
+      ].filter(d => d.value > 0); // Only show categories with values
+      console.log('Protection Status Counts for Chart:', protectionData);
+      return protectionData;
+    }
+
+    // Counting connection status
+    function connectionStatusCounts(data) {
+      const counts = { Conectado: 0, Desconectado: 0 };
+      data.forEach(row => {
+        counts[row.Connection ? 'Conectado' : 'Desconectado'] += 1;
+      });
+      const connectionData = [
+        { label: 'Conectado', value: counts.Conectado, key: 'Conectado' },
+        { label: 'Desconectado', value: counts.Desconectado, key: 'Desconectado' },
+      ];
+      console.log('Connection Status Counts for Chart:', connectionData);
+      return connectionData;
+    }
+
+    // Getting unique groups
+    function getUniqueGroups(data) {
+      const groups = new Set(data.map(row => row.Group));
+      return ['all', ...Array.from(groups).sort()];
+    }
+
+    // Global data for tooltip access
+    let currentData = [];
+
+    // Rendering charts (all bar charts) with custom tooltips
+    let cveChart, protectionChart, connectionChart;
+
+    function renderCharts(data) {
+      const cveData = aggregateCVEs(data);
+      const protectionData = protectionStatusCounts(data);
+      const connectionData = connectionStatusCounts(data);
+
+      if (cveChart) cveChart.destroy();
+      cveChart = new Chart(document.getElementById('cveChart'), {
+        type: 'bar',
+        data: {
+          labels: cveData.map(d => d.label),
+          datasets: [{
+            label: 'CVEs',
+            data: cveData.map(d => d.value),
+            backgroundColor: ['#ff4d4f', '#ff9800', '#4caf50', '#bdbdbd'], // Red, Orange, Green, Gray
+            borderRadius: 4,
+          }],
+        },
+        options: {
+          scales: {
+            y: {
+              beginAtZero: true,
+              ticks: {
+                callback: function (value) {
+                  if (value >= 1000) {
+                    return (value / 1000).toFixed(1) + 'k';
+                  }
+                  return value;
+                },
+              },
+            },
+          },
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              enabled: false,
+              external: function (context) {
+                const tooltipEl = document.getElementById('chartjs-tooltip') || document.createElement('div');
+                if (!document.getElementById('chartjs-tooltip')) {
+                  tooltipEl.id = 'chartjs-tooltip';
+                  tooltipEl.className = 'chart-tooltip';
+                  document.body.appendChild(tooltipEl);
+                }
+
+                tooltipEl.style.opacity = 0;
+
+                if (context.tooltip.opacity === 0) {
+                  return;
+                }
+
+                const label = context.tooltip.dataPoints[0].label;
+                const key = cveData.find(d => d.label === label).key;
+                const filteredData = currentData.filter(row => row.CVEs[key] > 0);
+                let tooltipContent = `${label}: ${context.tooltip.dataPoints[0].raw}\n\n`;
+                if (filteredData.length === 0) {
+                  tooltipContent += 'Nenhum endpoint encontrado.';
+                } else {
+                  const maxRows = 5;
+                  const displayData = filteredData.slice(0, maxRows);
+                  tooltipContent += displayData.map(row =>
+                    `Endpoint: ${row.Endpoint}\nGrupo: ${row.Group}\nCVEs ${label}: ${row.CVEs[key]}`
+                  ).join('\n\n');
+                  if (filteredData.length > maxRows) {
+                    tooltipContent += `\n\n...e mais ${filteredData.length - maxRows} endpoints.`;
+                  }
+                }
+
+                tooltipEl.innerText = tooltipContent;
+                tooltipEl.style.opacity = 1;
+
+                const position = context.chart.canvas.getBoundingClientRect();
+                tooltipEl.style.left = position.left + window.pageXOffset + context.tooltip.caretX + 'px';
+                tooltipEl.style.top = position.top + window.pageYOffset + context.tooltip.caretY - tooltipEl.offsetHeight - 10 + 'px';
+              },
+            },
+          },
+        },
+      });
+
+      if (protectionChart) protectionChart.destroy();
+      protectionChart = new Chart(document.getElementById('protectionChart'), {
+        type: 'bar',
+        data: {
+          labels: protectionData.map(d => d.label),
+          datasets: [{
+            label: 'Endpoints',
+            data: protectionData.map(d => d.value),
+            backgroundColor: ['#4caf50', '#bdbdbd', '#ff4d4f', '#ff9800'], // Green, Gray, Red, Orange
+            borderRadius: 4,
+          }],
+        },
+        options: {
+          scales: {
+            y: {
+              beginAtZero: true,
+              ticks: {
+                callback: function (value) {
+                  if (value >= 1000) {
+                    return (value / 1000).toFixed(1) + 'k';
+                  }
+                  return value;
+                },
+              },
+            },
+          },
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              enabled: false,
+              external: function (context) {
+                const tooltipEl = document.getElementById('chartjs-tooltip') || document.createElement('div');
+                if (!document.getElementById('chartjs-tooltip')) {
+                  tooltipEl.id = 'chartjs-tooltip';
+                  tooltipEl.className = 'chart-tooltip';
+                  document.body.appendChild(tooltipEl);
+                }
+
+                tooltipEl.style.opacity = 0;
+
+                if (context.tooltip.opacity === 0) {
+                  return;
+                }
+
+                const label = context.tooltip.dataPoints[0].label;
+                const filteredData = currentData.filter(row => row.Protection_status === label);
+                let tooltipContent = `${label}: ${context.tooltip.dataPoints[0].raw} (${((context.tooltip.dataPoints[0].raw / currentData.length) * 100).toFixed(1)}%)\n\n`;
+                if (filteredData.length === 0) {
+                  tooltipContent += 'Nenhum endpoint encontrado.';
+                } else {
+                  const maxRows = 5;
+                  const displayData = filteredData.slice(0, maxRows);
+                  tooltipContent += displayData.map(row =>
+                    `Endpoint: ${row.Endpoint}\nGrupo: ${row.Group}\nStatus: ${row.Protection_status}`
+                  ).join('\n\n');
+                  if (filteredData.length > maxRows) {
+                    tooltipContent += `\n\n...e mais ${filteredData.length - maxRows} endpoints.`;
+                  }
+                }
+
+                tooltipEl.innerText = tooltipContent;
+                tooltipEl.style.opacity = 1;
+
+                const position = context.chart.canvas.getBoundingClientRect();
+                tooltipEl.style.left = position.left + window.pageXOffset + context.tooltip.caretX + 'px';
+                tooltipEl.style.top = position.top + window.pageYOffset + context.tooltip.caretY - tooltipEl.offsetHeight - 10 + 'px';
+              },
+            },
+          },
+        },
+      });
+
+      if (connectionChart) connectionChart.destroy();
+      connectionChart = new Chart(document.getElementById('connectionChart'), {
+        type: 'bar',
+        data: {
+          labels: connectionData.map(d => d.label),
+          datasets: [{
+            label: 'Endpoints',
+            data: connectionData.map(d => d.value),
+            backgroundColor: ['#1976d2', '#ff4d4f'], // Blue, Red
+            borderRadius: 4,
+          }],
+        },
+        options: {
+          scales: {
+            y: {
+              beginAtZero: true,
+              ticks: {
+                callback: function (value) {
+                  return value; // Direct numbers like 800, 700
+                },
+              },
+            },
+          },
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              enabled: false,
+              external: function (context) {
+                const tooltipEl = document.getElementById('chartjs-tooltip') || document.createElement('div');
+                if (!document.getElementById('chartjs-tooltip')) {
+                  tooltipEl.id = 'chartjs-tooltip';
+                  tooltipEl.className = 'chart-tooltip';
+                  document.body.appendChild(tooltipEl);
+                }
+
+                tooltipEl.style.opacity = 0;
+
+                if (context.tooltip.opacity === 0) {
+                  return;
+                }
+
+                const label = context.tooltip.dataPoints[0].label;
+                const isConnected = label === 'Conectado';
+                const filteredData = currentData.filter(row => row.Connection === isConnected);
+                let tooltipContent = `${label}: ${context.tooltip.dataPoints[0].raw} (${((context.tooltip.dataPoints[0].raw / currentData.length) * 100).toFixed(1)}%)\n\n`;
+                if (filteredData.length === 0) {
+                  tooltipContent += 'Nenhum endpoint encontrado.';
+                } else {
+                  const maxRows = 5;
+                  const displayData = filteredData.slice(0, maxRows);
+                  tooltipContent += displayData.map(row =>
+                    `Endpoint: ${row.Endpoint}\nGrupo: ${row.Group}\nConexão: ${row.Connection ? 'Conectado' : 'Desconectado'}`
+                  ).join('\n\n');
+                  if (filteredData.length > maxRows) {
+                    tooltipContent += `\n\n...e mais ${filteredData.length - maxRows} endpoints.`;
+                  }
+                }
+
+                tooltipEl.innerText = tooltipContent;
+                tooltipEl.style.opacity = 1;
+
+                const position = context.chart.canvas.getBoundingClientRect();
+                tooltipEl.style.left = position.left + window.pageXOffset + context.tooltip.caretX + 'px';
+                tooltipEl.style.top = position.top + window.pageYOffset + context.tooltip.caretY - tooltipEl.offsetHeight - 10 + 'px';
+              },
+            },
+          },
+        },
+      });
+    }
+
+    // Rendering Endpoint Details table with pagination
+    let currentPageEndpoints = 1;
+    const rowsPerPage = 10;
+
+    function renderEndpointTable(data, groupFilter = 'all', page = 1) {
+      const filteredData = groupFilter === 'all' ? data : data.filter(row => row.Group === groupFilter);
+      const start = (page - 1) * rowsPerPage;
+      const end = start + rowsPerPage;
+      const paginatedData = filteredData.slice(start, end);
+
+      const tbody = document.querySelector('#endpointTable tbody');
+      tbody.innerHTML = '';
+      paginatedData.forEach(row => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${row.Endpoint}</td>
+          <td>${row.Group}</td>
+          <td>${row.Protection_status}</td>
+          <td>${row.CVEs.critical}</td>
+          <td>${row.CVEs.high}</td>
+          <td>${row.OS_version}</td>
+          <td>${row.Available_patches}</td>
+        `;
+        tbody.appendChild(tr);
+      });
+
+      const totalPages = Math.ceil(filteredData.length / rowsPerPage);
+      const pagination = document.getElementById('endpointPagination');
+      pagination.innerHTML = '';
+
+      const prevBtn = document.createElement('button');
+      prevBtn.className = 'page-btn' + (page === 1 ? ' disabled' : '');
+      prevBtn.textContent = 'Anterior';
+      prevBtn.disabled = page === 1;
+      prevBtn.addEventListener('click', () => {
+        if (page > 1) {
+          currentPageEndpoints--;
+          renderEndpointTable(data, groupFilter, currentPageEndpoints);
+        }
+      });
+      pagination.appendChild(prevBtn);
+
+      const maxPagesToShow = 5;
+      let startPage = Math.max(1, page - Math.floor(maxPagesToShow / 2));
+      let endPage = Math.min(totalPages, startPage + maxPagesToShow - 1);
+      if (endPage - startPage + 1 < maxPagesToShow) {
+        startPage = Math.max(1, endPage - maxPagesToShow + 1);
+      }
+
+      for (let i = startPage; i <= endPage; i++) {
+        const pageBtn = document.createElement('button');
+        pageBtn.className = 'page-btn' + (i === page ? ' active' : '');
+        pageBtn.textContent = i;
+        pageBtn.addEventListener('click', () => {
+          currentPageEndpoints = i;
+          renderEndpointTable(data, groupFilter, currentPageEndpoints);
+        });
+        pagination.appendChild(pageBtn);
+      }
+
+      const nextBtn = document.createElement('button');
+      nextBtn.className = 'page-btn' + (page === totalPages ? ' disabled' : '');
+      nextBtn.textContent = 'Próximo';
+      nextBtn.disabled = page === totalPages;
+      nextBtn.addEventListener('click', () => {
+        if (page < totalPages) {
+          currentPageEndpoints++;
+          renderEndpointTable(data, groupFilter, currentPageEndpoints);
+        }
+      });
+      pagination.appendChild(nextBtn);
+    }
+
+    // Helper function to sort by criticality
+    function sortByCriticality(data) {
+      return [...data].sort((a, b) => {
+        if (b.CVEs.critical !== a.CVEs.critical) {
+          return b.CVEs.critical - a.CVEs.critical;
+        }
+        if (b.CVEs.high !== a.CVEs.high) {
+          return b.CVEs.high - a.CVEs.high;
+        }
+        return a.Endpoint.localeCompare(b.Endpoint);
+      });
+    }
+
+    // Helper function to determine critical endpoints (top 10% or at least 1 critical CVE)
+    function getCriticalEndpoints(data) {
+      const sorted = sortByCriticality(data);
+      const thresholdIndex = Math.max(1, Math.ceil(sorted.length * 0.1));
+      const thresholdCVE = sorted.length > 0 ? Math.max(sorted[thresholdIndex - 1].CVEs.critical, 1) : 1;
+      return new Set(sorted.filter(row => row.CVEs.critical >= thresholdCVE).map(row => row.Endpoint));
+    }
+
+    // Rendering Top Risks table with pagination, group filter, and sorting
+    let currentPageRisks = 1;
+
+    function renderRiskTable(data, groupFilter = 'all', page = 1) {
+      let risks = data.filter(row => row.CVEs.critical > 0 || row.OS_release_name.includes('Windows 7'));
+      if (groupFilter !== 'all') {
+        risks = risks.filter(row => row.Group === groupFilter);
+      }
+
+      risks = sortByCriticality(risks);
+
+      const criticalEndpoints = getCriticalEndpoints(risks);
+
+      const start = (page - 1) * rowsPerPage;
+      const end = start + rowsPerPage;
+      const paginatedRisks = risks.slice(start, end);
+
+      const tbody = document.querySelector('#riskTable tbody');
+      tbody.innerHTML = '';
+      paginatedRisks.forEach(row => {
+        const reason = row.CVEs.critical > 0 ? 'CVEs Críticos' : 'SO Desatualizado';
+        const tr = document.createElement('tr');
+        if (criticalEndpoints.has(row.Endpoint)) {
+          tr.classList.add('critical');
+        }
+        tr.innerHTML = `
+          <td>${row.Endpoint}</td>
+          <td>${row.Group}</td>
+          <td>${row.CVEs.critical}</td>
+          <td>${row.OS_version}</td>
+          <td>${reason}</td>
+        `;
+        tbody.appendChild(tr);
+      });
+
+      const totalPages = Math.ceil(risks.length / rowsPerPage);
+      const pagination = document.getElementById('riskPagination');
+      pagination.innerHTML = '';
+
+      const prevBtn = document.createElement('button');
+      prevBtn.className = 'page-btn' + (page === 1 ? ' disabled' : '');
+      prevBtn.textContent = 'Anterior';
+      prevBtn.disabled = page === 1;
+      prevBtn.addEventListener('click', () => {
+        if (page > 1) {
+          currentPageRisks--;
+          renderRiskTable(data, groupFilter, currentPageRisks);
+          renderInterestingTable(data, groupFilter, currentPageInteresting);
+        }
+      });
+      pagination.appendChild(prevBtn);
+
+      const maxPagesToShow = 5;
+      let startPage = Math.max(1, page - Math.floor(maxPagesToShow / 2));
+      let endPage = Math.min(totalPages, startPage + maxPagesToShow - 1);
+      if (endPage - startPage + 1 < maxPagesToShow) {
+        startPage = Math.max(1, endPage - maxPagesToShow + 1);
+      }
+
+      for (let i = startPage; i <= endPage; i++) {
+        const pageBtn = document.createElement('button');
+        pageBtn.className = 'page-btn' + (i === page ? ' active' : '');
+        pageBtn.textContent = i;
+        pageBtn.addEventListener('click', () => {
+          currentPageRisks = i;
+          renderRiskTable(data, groupFilter, currentPageRisks);
+          renderInterestingTable(data, groupFilter, currentPageInteresting);
+        });
+        pagination.appendChild(pageBtn);
+      }
+
+      const nextBtn = document.createElement('button');
+      nextBtn.className = 'page-btn' + (page === totalPages ? ' disabled' : '');
+      nextBtn.textContent = 'Próximo';
+      nextBtn.disabled = page === totalPages;
+      nextBtn.addEventListener('click', () => {
+        if (page < totalPages) {
+          currentPageRisks++;
+          renderRiskTable(data, groupFilter, currentPageRisks);
+          renderInterestingTable(data, groupFilter, currentPageInteresting);
+        }
+      });
+      pagination.appendChild(nextBtn);
+    }
+
+    // Sorting Top Risks table (overrides default criticality sort)
+    function sortRiskTable(data, key, order, groupFilter, page) {
+      let risks = data.filter(row => row.CVEs.critical > 0 || row.OS_release_name.includes('Windows 7'));
+      if (groupFilter !== 'all') {
+        risks = risks.filter(row => row.Group === groupFilter);
+      }
+      const sorted = [...risks].sort((a, b) => {
+        let aVal, bVal;
+        if (key === 'reason') {
+          aVal = a.CVEs.critical > 0 ? 'CVEs Críticos' : 'SO Desatualizado';
+          bVal = b.CVEs.critical > 0 ? 'CVEs Críticos' : 'SO Desatualizado';
+        } else {
+          aVal = key.includes('.') ? key.split('.').reduce((o, i) => o[i], a) : a[key];
+          bVal = key.includes('.') ? key.split('.').reduce((o, i) => o[i], b) : b[key];
+        }
+        if (typeof aVal === 'string') {
+          return order === 'asc' ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
+        }
+        return order === 'asc' ? aVal - bVal : bVal - aVal;
+      });
+      renderRiskTable(data.filter(row => sorted.includes(row)), groupFilter, page);
+    }
+
+    // Rendering Interesting Facts table with pagination, group filter, and sorting
+    let currentPageInteresting = 1;
+
+    function renderInterestingTable(data, groupFilter = 'all', page = 1) {
+      let interesting = data.filter(row => row.CVEs.critical > 0);
+      if (groupFilter !== 'all') {
+        interesting = interesting.filter(row => row.Group === groupFilter);
+      }
+
+      interesting = sortByCriticality(interesting);
+
+      const start = (page - 1) * rowsPerPage;
+      const end = start + rowsPerPage;
+      const paginatedInteresting = interesting.slice(start, end);
+
+      const tbody = document.querySelector('#interestingTable tbody');
+      tbody.innerHTML = '';
+      paginatedInteresting.forEach(row => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${row.Endpoint}</td>
+          <td>${row.Group}</td>
+          <td>${row.CVEs.critical}</td>
+        `;
+        tbody.appendChild(tr);
+      });
+
+      const totalPages = Math.ceil(interesting.length / rowsPerPage);
+      const pagination = document.getElementById('interestingPagination');
+      pagination.innerHTML = '';
+
+      const prevBtn = document.createElement('button');
+      prevBtn.className = 'page-btn' + (page === 1 ? ' disabled' : '');
+      prevBtn.textContent = 'Anterior';
+      prevBtn.disabled = page === 1;
+      prevBtn.addEventListener('click', () => {
+        if (page > 1) {
+          currentPageInteresting--;
+          renderInterestingTable(data, groupFilter, currentPageInteresting);
+        }
+      });
+      pagination.appendChild(prevBtn);
+
+      const maxPagesToShow = 5;
+      let startPage = Math.max(1, page - Math.floor(maxPagesToShow / 2));
+      let endPage = Math.min(totalPages, startPage + maxPagesToShow - 1);
+      if (endPage - startPage + 1 < maxPagesToShow) {
+        startPage = Math.max(1, endPage - maxPagesToShow + 1);
+      }
+
+      for (let i = startPage; i <= endPage; i++) {
+        const pageBtn = document.createElement('button');
+        pageBtn.className = 'page-btn' + (i === page ? ' active' : '');
+        pageBtn.textContent = i;
+        pageBtn.addEventListener('click', () => {
+          currentPageInteresting = i;
+          renderInterestingTable(data, groupFilter, currentPageInteresting);
+        });
+        pagination.appendChild(pageBtn);
+      }
+
+      const nextBtn = document.createElement('button');
+      nextBtn.className = 'page-btn' + (page === totalPages ? ' disabled' : '');
+      nextBtn.textContent = 'Próximo';
+      nextBtn.disabled = page === totalPages;
+      nextBtn.addEventListener('click', () => {
+        if (page < totalPages) {
+          currentPageInteresting++;
+          renderInterestingTable(data, groupFilter, currentPageInteresting);
+        }
+      });
+      pagination.appendChild(nextBtn);
+    }
+
+    // Sorting Interesting Facts table
+    function sortInterestingTable(data, key, order, groupFilter, page) {
+      let interesting = data.filter(row => row.CVEs.critical > 0);
+      if (groupFilter !== 'all') {
+        interesting = interesting.filter(row => row.Group === groupFilter);
+      }
+      const sorted = [...interesting].sort((a, b) => {
+        let aVal = key.includes('.') ? key.split('.').reduce((o, i) => o[i], a) : a[key];
+        let bVal = key.includes('.') ? key.split('.').reduce((o, i) => o[i], b) : b[key];
+        if (typeof aVal === 'string') {
+          return order === 'asc' ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
+        }
+        return order === 'asc' ? aVal - bVal : bVal - aVal;
+      });
+      renderInterestingTable(data.filter(row => sorted.includes(row)), groupFilter, page);
+    }
+
+    // Rendering summary
+    function renderSummary(data) {
+      const totalEndpoints = data.length;
+      const connected = data.filter(row => row.Connection).length;
+      const criticalCVEs = aggregateCVEs(data).find(c => c.label === 'Crítico').value;
+      const outdatedOS = data.filter(row => row.OS_release_name.includes('Windows 7')).length;
+
+      document.getElementById('total-endpoints').textContent = totalEndpoints;
+      document.getElementById('connected').textContent = connected;
+      document.getElementById('critical-cves').textContent = criticalCVEs;
+      document.getElementById('outdated-os').textContent = outdatedOS;
+    }
+
+    // Populating group filter for all tables
+    function populateGroupFilter(data) {
+      const endpointSelect = document.getElementById('groupFilter');
+      const riskSelect = document.getElementById('riskGroupFilter');
+      const interestingSelect = document.getElementById('interestingGroupFilter');
+      endpointSelect.innerHTML = '';
+      riskSelect.innerHTML = '';
+      interestingSelect.innerHTML = '';
+      getUniqueGroups(data).forEach(group => {
+        const endpointOption = document.createElement('option');
+        endpointOption.value = group;
+        endpointOption.textContent = group === 'all' ? 'Todos os Grupos' : group;
+        endpointSelect.appendChild(endpointOption);
+
+        const riskOption = document.createElement('option');
+        riskOption.value = group;
+        riskOption.textContent = group === 'all' ? 'Todos os Grupos' : group;
+        riskSelect.appendChild(riskOption);
+
+        const interestingOption = document.createElement('option');
+        interestingOption.value = group;
+        interestingOption.textContent = group === 'all' ? 'Todos os Grupos' : group;
+        interestingSelect.appendChild(interestingOption);
+      });
+    }
+
+    // Sorting Endpoint Details table
+    function sortTable(data, key, order, groupFilter, page) {
+      const sorted = [...data].sort((a, b) => {
+        let aVal = key.includes('.') ? key.split('.').reduce((o, i) => o[i], a) : a[key];
+        let bVal = key.includes('.') ? key.split('.').reduce((o, i) => o[i], b) : b[key];
+        if (typeof aVal === 'string') {
+          return order === 'asc' ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
+        }
+        return order === 'asc' ? aVal - bVal : bVal - aVal;
+      });
+      renderEndpointTable(sorted, groupFilter, page);
+    }
+
+    // Get current date for PDF export
+    function getCurrentDate() {
+      const today = new Date();
+      const day = String(today.getDate()).padStart(2, '0');
+      const month = String(today.getMonth() + 1).padStart(2, '0');
+      const year = today.getFullYear();
+      const hours = String(today.getHours()).padStart(2, '0');
+      const minutes = String(today.getMinutes()).padStart(2, '0');
+      return `${day}/${month}/${year} ${hours}:${minutes}`;
+    }
+
+    // Exporting table as PDF with enhanced styling
+    function exportTableToPDF(data, groupFilter = 'all') {
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF({
+        orientation: 'landscape', // Better for wide tables
+        unit: 'mm',
+        format: 'a4',
+      });
+
+      // Colors (matching dashboard)
+      const primaryColor = [30, 64, 175]; // #1e40af
+      const secondaryColor = [37, 99, 235]; // #2563eb
+      const accentColor = [220, 38, 38]; // #dc2626
+      const lightGray = [249, 250, 251]; // #f9fafb
+      const criticalBg = [254, 242, 242]; // #fef2f2
+      const highlightBg = [219, 234, 254]; // #dbeafe
+
+      // Header
+      doc.setFillColor(...primaryColor);
+      doc.rect(0, 0, 297, 20, 'F'); // Header background
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(16);
+      doc.setFont('helvetica', 'bold');
+      doc.text('Relatório de Segurança de Endpoints', 14, 12);
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'normal');
+      doc.text(`Gerado em: ${getCurrentDate()}`, 260, 12, { align: 'right' });
+
+      // Logo placeholder (text-based)- [Logo Empresa]
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(12);
+      doc.text('', 14, 8);
+
+      // Divider
+      doc.setDrawColor(...secondaryColor);
+      doc.setLineWidth(0.5);
+      doc.line(14, 22, 283, 22);
+
+      // Summary Section
+      const totalEndpoints = data.length;
+      const connected = data.filter(row => row.Connection).length;
+      const criticalCVEs = aggregateCVEs(data).find(c => c.label === 'Crítico').value;
+      const outdatedOS = data.filter(row => row.OS_release_name.includes('Windows 7')).length;
+
+      doc.setFontSize(12);
+      doc.setTextColor(31, 41, 55); // #1f2937
+      doc.setFont('helvetica', 'bold');
+      doc.text('Resumo', 14, 30);
+
+      const summaryData = [
+        ['Total de Endpoints', totalEndpoints],
+        ['Conectados', connected],
+        ['CVEs Críticos', criticalCVEs],
+        ['SO Desatualizado', outdatedOS],
+      ];
+
+      doc.autoTable({
+        startY: 34,
+        head: [['Métrica', 'Valor']],
+        body: summaryData,
+        theme: 'plain',
+        styles: {
+          font: 'helvetica',
+          fontSize: 10,
+          cellPadding: 2,
+          textColor: [31, 41, 55],
+          lineColor: [229, 231, 235], // #e5e7eb
+          lineWidth: 0.1,
+        },
+        headStyles: {
+          fillColor: [229, 231, 235], // #e5e7eb
+          textColor: [31, 41, 55],
+          fontSize: 11,
+          fontStyle: 'bold',
+        },
+        bodyStyles: {
+          fillColor: [255, 255, 255],
+        },
+        alternateRowStyles: {
+          fillColor: lightGray,
+        },
+        columnStyles: {
+          0: { cellWidth: 50 },
+          1: { cellWidth: 30, halign: 'center' },
+        },
+        margin: { left: 14, right: 14 },
+      });
+
+      // Main Table Title
+      let startY = doc.lastAutoTable.finalY + 10;
+      doc.setFontSize(14);
+      doc.setTextColor(31, 41, 55);
+      doc.setFont('helvetica', 'bold');
+      doc.text('Detalhes dos Endpoints', 14, startY);
+
+      // Prepare table data
+      let filteredData = groupFilter === 'all' ? data : data.filter(row => row.Group === groupFilter);
+      filteredData = sortByCriticality(filteredData);
+
+      const criticalEndpoints = getCriticalEndpoints(filteredData);
+
+      const headers = ['Endpoint', 'Grupo', 'Status de Proteção', 'CVEs Críticos', 'CVEs Altos', 'Versão do SO', 'Patches'];
+      const rows = filteredData.map(row => [
+        row.Endpoint,
+        row.Group,
+        row.Protection_status,
+        row.CVEs.critical,
+        row.CVEs.high,
+        row.OS_version,
+        row.Available_patches,
+      ]);
+
+      // Main Table
+      doc.autoTable({
+        head: [headers],
+        body: rows,
+        startY: startY + 6,
+        theme: 'grid',
+        styles: {
+          font: 'helvetica',
+          fontSize: 9,
+          cellPadding: 3,
+          textColor: [31, 41, 55],
+          lineColor: [229, 231, 235],
+          lineWidth: 0.1,
+          overflow: 'linebreak',
+        },
+        headStyles: {
+          fillColor: secondaryColor,
+          textColor: [255, 255, 255],
+          fontSize: 10,
+          fontStyle: 'bold',
+          halign: 'center',
+        },
+        bodyStyles: {
+          fillColor: [255, 255, 255],
+        },
+        alternateRowStyles: {
+          fillColor: lightGray,
+        },
+        columnStyles: {
+          0: { cellWidth: 60, halign: 'left' },
+          1: { cellWidth: 40, halign: 'left' },
+          2: { cellWidth: 40, halign: 'center' },
+          3: { cellWidth: 30, halign: 'center' },
+          4: { cellWidth: 30, halign: 'center' },
+          5: { cellWidth: 40, halign: 'center' },
+          6: { cellWidth: 20, halign: 'center' },
+        },
+        didParseCell: (data) => {
+          if (data.section === 'body') {
+            const rowEndpoint = data.row.raw[0];
+            if (criticalEndpoints.has(rowEndpoint)) {
+              if (data.column.index === 0) {
+                data.cell.styles.fillColor = highlightBg;
+              } else if (data.column.index === 3) {
+                data.cell.styles.fillColor = criticalBg;
+              } else {
+                data.cell.styles.fillColor = highlightBg;
+              }
+            }
+          }
+        },
+        margin: { left: 14, right: 14 },
+      });
+
+      // Footer
+      const pageCount = doc.internal.getNumberOfPages();
+      for (let i = 1; i <= pageCount; i++) {
+        doc.setPage(i);
+        doc.setFontSize(8);
+        doc.setTextColor(107, 114, 128); // #6b7280
+        doc.setFont('helvetica', 'normal');
+        doc.text('xAI - Relatório de Segurança', 14, 205);
+        doc.text(`Página ${i} de ${pageCount}`, 283, 205, { align: 'right' });
+      }
+
+      doc.save('detalhes_endpoints.pdf');
+    }
+
+    // Utility functions
+    function showLoading(message) {
+      document.getElementById('loading').textContent = message;
+      document.getElementById('loading').style.display = 'block';
+      document.getElementById('error').style.display = 'none';
+      document.getElementById('dashboard').style.display = 'none';
+    }
+
+    function hideLoading() {
+      document.getElementById('loading').style.display = 'none';
+    }
+
+    function showError(message) {
+      document.getElementById('error').textContent = message;
+      document.getElementById('error').style.display = 'block';
+      document.getElementById('loading').style.display = 'none';
+      document.getElementById('dashboard').style.display = 'none';
+    }
+
+    function showDashboard() {
+      document.getElementById('dashboard').style.display = 'block';
+      document.getElementById('loading').style.display = 'none';
+      document.getElementById('error').style.display = 'none';
+    }
+
+    // Handling file upload (XLSX only)
+    const fileInput = document.getElementById('fileInputElement');
+    const dropZone = document.getElementById('fileInput');
+
+    fileInput.addEventListener('change', handleFile);
+    dropZone.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      dropZone.classList.add('dragover');
+    });
+    dropZone.addEventListener('dragleave', () => {
+      dropZone.classList.remove('dragover');
+    });
+    dropZone.addEventListener('drop', (e) => {
+      e.preventDefault();
+      dropZone.classList.remove('dragover');
+      const file = e.dataTransfer.files[0];
+      if (file) {
+        fileInput.files = e.dataTransfer.files;
+        handleFile({ target: { files: [file] } });
+      }
+    });
+
+    function handleFile(event) {
+      const file = event.target.files[0];
+      if (!file || !file.name.toLowerCase().endsWith('.xlsx')) {
+        showError('Por favor, carregue um arquivo XLSX válido.');
+        return;
+      }
+
+      showLoading('Processando arquivo XLSX...');
+
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const data = new Uint8Array(e.target.result);
+          const workbook = XLSX.read(data, { type: 'array' });
+          const sheetName = workbook.SheetNames[0];
+          const worksheet = workbook.Sheets[sheetName];
+          const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: '' });
+          const headers = jsonData[0].map(header => header.trim().replace(/^"|"$/g, ''));
+          const rows = jsonData.slice(1).map(row => {
+            const obj = {};
+            headers.forEach((header, i) => {
+              obj[header] = typeof row[i] === 'string' ? row[i].trim().replace(/^"|"$/g, '') : row[i] || '';
+            });
+            return obj;
+          });
+          console.log('Raw XLSX Data:', rows);
+          currentData = processData(rows);
+          currentPageEndpoints = 1;
+          currentPageRisks = 1;
+          currentPageInteresting = 1;
+          renderSummary(currentData);
+          renderCharts(currentData);
+          renderEndpointTable(currentData, 'all', currentPageEndpoints);
+          renderRiskTable(currentData, 'all', currentPageRisks);
+          renderInterestingTable(currentData, 'all', currentPageInteresting);
+          populateGroupFilter(currentData);
+
+          hideLoading();
+          showDashboard();
+        } catch (err) {
+          showError('Erro ao processar arquivo XLSX: ' + err.message);
+        }
+      };
+      reader.onerror = () => {
+        showError('Erro ao ler arquivo XLSX.');
+      };
+      reader.readAsArrayBuffer(file);
+    }
+
+    // Event listeners
+    document.getElementById('groupFilter').addEventListener('change', (e) => {
+      currentPageEndpoints = 1;
+      renderEndpointTable(currentData, e.target.value, currentPageEndpoints);
+    });
+
+    document.getElementById('riskGroupFilter').addEventListener('change', (e) => {
+      currentPageRisks = 1;
+      currentPageInteresting = 1;
+      renderRiskTable(currentData, e.target.value, currentPageRisks);
+      renderInterestingTable(currentData, e.target.value, currentPageInteresting);
+    });
+
+    document.getElementById('interestingGroupFilter').addEventListener('change', (e) => {
+      currentPageInteresting = 1;
+      renderInterestingTable(currentData, e.target.value, currentPageInteresting);
+    });
+
+    document.getElementById('exportBtn').addEventListener('click', () => {
+      exportTableToPDF(currentData, document.getElementById('groupFilter').value);
+    });
+
+    document.querySelectorAll('#endpointTable th').forEach(th => {
+      th.addEventListener('click', () => {
+        const key = th.dataset.sort;
+        const order = th.dataset.order === 'asc' ? 'desc' : 'asc';
+        th.dataset.order = order;
+        sortTable(currentData, key, order, document.getElementById('groupFilter').value, currentPageEndpoints);
+      });
+    });
+
+    document.querySelectorAll('#riskTable th').forEach(th => {
+      th.addEventListener('click', () => {
+        const key = th.dataset.sort;
+        const order = th.dataset.order === 'asc' ? 'desc' : 'asc';
+        th.dataset.order = order;
+        sortRiskTable(currentData, key, order, document.getElementById('riskGroupFilter').value, currentPageRisks);
+      });
+    });
+
+    document.querySelectorAll('#interestingTable th').forEach(th => {
+      th.addEventListener('click', () => {
+        const key = th.dataset.sort;
+        const order = th.dataset.order === 'asc' ? 'desc' : 'asc';
+        th.dataset.order = order;
+        sortInterestingTable(currentData, key, order, document.getElementById('interestingGroupFilter').value, currentPageInteresting);
+      });
+    });
+
+    // Hide tooltip when mouse leaves canvas
+    document.querySelectorAll('canvas').forEach(canvas => {
+      canvas.addEventListener('mouseout', () => {
+        const tooltipEl = document.getElementById('chartjs-tooltip');
+        if (tooltipEl) {
+          tooltipEl.style.opacity = 0;
+        }
+      });
+    });
+  </script>
+</body>
+
+</html>
