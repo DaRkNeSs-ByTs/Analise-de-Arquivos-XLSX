@@ -20,8 +20,8 @@
       --text-color: #1f2937;
       --text-secondary: #4b5563;
       --border-color: #e5e7eb;
-      --shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
-      --shadow-hover: 0 6px 16px rgba(0, 0, 0, 0.12);
+      --shadow: 0 4px 12px rgba(0, 0, 0, 2);
+      --shadow-hover: 0 6px 16px rgba(0, 0, 0, 2);
     }
 
     * {
@@ -151,6 +151,30 @@
 
     .chart:hover {
       box-shadow: var(--shadow-hover);
+    }
+
+    .chart-legend {
+      margin-top: 10px;
+      font-size: 0.9rem;
+      color: var(--text-secondary);
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      justify-content: center;
+    }
+
+    .chart-legend span {
+      display: flex;
+      align-items: center;
+    }
+
+    .chart-legend span::before {
+      content: '';
+      display: inline-block;
+      width: 12px;
+      height: 12px;
+      margin-right: 5px;
+      border-radius: 3px;
     }
 
     .table-container {
@@ -385,14 +409,17 @@
         <div class="chart">
           <h3>CVEs por Gravidade</h3>
           <canvas id="cveChart"></canvas>
+          <div class="chart-legend" id="cveLegend"></div>
         </div>
         <div class="chart">
           <h3>Status de Proteção</h3>
           <canvas id="protectionChart"></canvas>
+          <div class="chart-legend" id="protectionLegend"></div>
         </div>
         <div class="chart">
           <h3>Status de Conexão</h3>
           <canvas id="connectionChart"></canvas>
+          <div class="chart-legend" id="connectionLegend"></div>
         </div>
       </div>
       <div class="table-container">
@@ -443,7 +470,7 @@
         <div class="pagination" id="interestingPagination"></div>
       </div>
       <div class="table-container">
-        <div class "table-header">
+        <div class="table-header">
           <h3>Principais Riscos</h3>
           <div class="group-filter">
             <select id="riskGroupFilter">
@@ -469,6 +496,11 @@
   </div>
 
   <script>
+    // Dynamic column mapping
+    function findColumn(headers, keywords) {
+      return headers.find(header => keywords.some(keyword => header.toLowerCase().includes(keyword.toLowerCase()))) || null;
+    }
+
     // Parsing and cleaning CVE string
     function parseCVEs(cveString) {
       if (!cveString || typeof cveString !== 'string') {
@@ -481,12 +513,20 @@
           cveObj[key.trim()] = parseInt(value.trim(), 10);
         }
       });
-      console.log('Parsed CVEs:', cveString, '->', cveObj);
       return cveObj;
     }
 
     // Processing and cleaning data for XLSX
-    function processData(rawData) {
+    function processData(rawData, headers) {
+      const endpointCol = findColumn(headers, ['Endpoint']);
+      const connectionCol = findColumn(headers, ['Connection']);
+      const groupCol = findColumn(headers, ['Group']);
+      const protectionCol = findColumn(headers, ['Protection status', 'Protection']);
+      const cveCol = findColumn(headers, ['CVEs by severity', 'CVEs']);
+      const osVersionCol = findColumn(headers, ['OS version']);
+      const osReleaseCol = findColumn(headers, ['OS release name']);
+      const patchesCol = findColumn(headers, ['Available patches', 'Patches']);
+
       const processed = rawData
         .filter(row => Object.keys(row).length > 0 && Object.values(row).some(val => val !== '' && val !== null && val !== undefined))
         .map(row => {
@@ -496,39 +536,28 @@
             normalizedRow[normalizedKey] = typeof row[key] === 'string' ? row[key].trim().replace(/^"|"$/g, '') : row[key];
           });
 
-          // Map Protection_status to expected labels
           const protectionStatusMap = {
             'protected': 'protected',
             'scan_only': 'scan_only',
             'unprotected': 'unprotected',
             'pending': 'pending',
-            'desconhecido': 'unprotected', // Default mapping for unknown values
+            'desconhecido': 'unprotected',
           };
-          const rawProtectionStatus = normalizedRow['Protection status'] || 'desconhecido';
+          const rawProtectionStatus = normalizedRow[protectionCol] || 'desconhecido';
           const mappedProtectionStatus = protectionStatusMap[rawProtectionStatus.toLowerCase()] || 'unprotected';
 
-          const processedRow = {
-            Endpoint: normalizedRow.Endpoint || 'desconhecido',
-            Connection: normalizedRow.Connection === 'true' ? true : normalizedRow.Connection === 'false' ? false : false,
-            Group: normalizedRow.Group || 'desconhecido',
+          return {
+            Endpoint: normalizedRow[endpointCol] || 'desconhecido',
+            Connection: normalizedRow[connectionCol] === 'true' || normalizedRow[connectionCol] === true,
+            Group: normalizedRow[groupCol] || 'desconhecido',
             Protection_status: mappedProtectionStatus,
-            CVEs: parseCVEs(normalizedRow['CVEs by severity']),
-            OS_version: normalizedRow['OS version'] || 'desconhecido',
-            OS_release_name: normalizedRow['OS release name'] || 'desconhecido',
-            Available_patches: !isNaN(parseInt(normalizedRow['Available patches'], 10)) ? parseInt(normalizedRow['Available patches'], 10) : 0,
+            CVEs: parseCVEs(normalizedRow[cveCol]),
+            OS_version: normalizedRow[osVersionCol] || 'desconhecido',
+            OS_release_name: normalizedRow[osReleaseCol] || 'desconhecido',
+            Available_patches: !isNaN(parseInt(normalizedRow[patchesCol], 10)) ? parseInt(normalizedRow[patchesCol], 10) : 0,
           };
-
-          console.log('Processed Row for Charts:', {
-            Endpoint: processedRow.Endpoint,
-            Connection: processedRow.Connection,
-            Protection_status: processedRow.Protection_status,
-            CVEs: processedRow.CVEs,
-          });
-
-          return processedRow;
         });
 
-      console.log('Processed Data:', processed);
       return processed;
     }
 
@@ -541,14 +570,12 @@
         totals.medium += row.CVEs.medium || 0;
         totals.low += row.CVEs.low || 0;
       });
-      const cveData = [
-        { label: 'Crítico', value: totals.critical, key: 'critical' },
-        { label: 'Alto', value: totals.high, key: 'high' },
-        { label: 'Médio', value: totals.medium, key: 'medium' },
-        { label: 'Baixo', value: totals.low, key: 'low' },
+      return [
+        { label: 'Crítico', value: totals.critical, key: 'critical', color: '#ff4d4f' },
+        { label: 'Alto', value: totals.high, key: 'high', color: '#ff9800' },
+        { label: 'Médio', value: totals.medium, key: 'medium', color: '#4caf50' },
+        { label: 'Baixo', value: totals.low, key: 'low', color: '#bdbdbd' },
       ];
-      console.log('Aggregated CVEs for Chart:', cveData);
-      return cveData;
     }
 
     // Counting protection status
@@ -558,14 +585,12 @@
         const status = row.Protection_status || 'unprotected';
         counts[status] = (counts[status] || 0) + 1;
       });
-      const protectionData = [
-        { label: 'protected', value: counts.protected, key: 'protected' },
-        { label: 'scan_only', value: counts.scan_only, key: 'scan_only' },
-        { label: 'unprotected', value: counts.unprotected, key: 'unprotected' },
-        { label: 'pending', value: counts.pending, key: 'pending' },
-      ].filter(d => d.value > 0); // Only show categories with values
-      console.log('Protection Status Counts for Chart:', protectionData);
-      return protectionData;
+      return [
+        { label: 'Protegido', value: counts.protected, key: 'protected', color: '#4caf50' },
+        { label: 'Somente Escaneado', value: counts.scan_only, key: 'scan_only', color: '#bdbdbd' },
+        { label: 'Desprotegido', value: counts.unprotected, key: 'unprotected', color: '#ff4d4f' },
+        { label: 'Pendente', value: counts.pending, key: 'pending', color: '#ff9800' },
+      ].filter(d => d.value > 0);
     }
 
     // Counting connection status
@@ -574,12 +599,10 @@
       data.forEach(row => {
         counts[row.Connection ? 'Conectado' : 'Desconectado'] += 1;
       });
-      const connectionData = [
-        { label: 'Conectado', value: counts.Conectado, key: 'Conectado' },
-        { label: 'Desconectado', value: counts.Desconectado, key: 'Desconectado' },
+      return [
+        { label: 'Conectado', value: counts.Conectado, key: 'Conectado', color: '#1976d2' },
+        { label: 'Desconectado', value: counts.Desconectado, key: 'Desconectado', color: '#ff4d4f' },
       ];
-      console.log('Connection Status Counts for Chart:', connectionData);
-      return connectionData;
     }
 
     // Getting unique groups
@@ -591,7 +614,7 @@
     // Global data for tooltip access
     let currentData = [];
 
-    // Rendering charts (all bar charts) with custom tooltips
+    // Rendering charts (all bar charts) with custom tooltips and legends
     let cveChart, protectionChart, connectionChart;
 
     function renderCharts(data) {
@@ -599,6 +622,7 @@
       const protectionData = protectionStatusCounts(data);
       const connectionData = connectionStatusCounts(data);
 
+      // CVE Chart
       if (cveChart) cveChart.destroy();
       cveChart = new Chart(document.getElementById('cveChart'), {
         type: 'bar',
@@ -607,7 +631,7 @@
           datasets: [{
             label: 'CVEs',
             data: cveData.map(d => d.value),
-            backgroundColor: ['#ff4d4f', '#ff9800', '#4caf50', '#bdbdbd'], // Red, Orange, Green, Gray
+            backgroundColor: cveData.map(d => d.color),
             borderRadius: 4,
           }],
         },
@@ -672,6 +696,17 @@
         },
       });
 
+      // CVE Legend
+      const cveLegend = document.getElementById('cveLegend');
+      cveLegend.innerHTML = '';
+      cveData.forEach(item => {
+        const span = document.createElement('span');
+        span.innerHTML = `${item.label}: ${item.value}`;
+        span.style.setProperty('--legend-color', item.color);
+        cveLegend.appendChild(span);
+      });
+
+      // Protection Chart
       if (protectionChart) protectionChart.destroy();
       protectionChart = new Chart(document.getElementById('protectionChart'), {
         type: 'bar',
@@ -680,7 +715,7 @@
           datasets: [{
             label: 'Endpoints',
             data: protectionData.map(d => d.value),
-            backgroundColor: ['#4caf50', '#bdbdbd', '#ff4d4f', '#ff9800'], // Green, Gray, Red, Orange
+            backgroundColor: protectionData.map(d => d.color),
             borderRadius: 4,
           }],
         },
@@ -744,6 +779,17 @@
         },
       });
 
+      // Protection Legend
+      const protectionLegend = document.getElementById('protectionLegend');
+      protectionLegend.innerHTML = '';
+      protectionData.forEach(item => {
+        const span = document.createElement('span');
+        span.innerHTML = `${item.label}: ${item.value}`;
+        span.style.setProperty('--legend-color', item.color);
+        protectionLegend.appendChild(span);
+      });
+
+      // Connection Chart
       if (connectionChart) connectionChart.destroy();
       connectionChart = new Chart(document.getElementById('connectionChart'), {
         type: 'bar',
@@ -752,7 +798,7 @@
           datasets: [{
             label: 'Endpoints',
             data: connectionData.map(d => d.value),
-            backgroundColor: ['#1976d2', '#ff4d4f'], // Blue, Red
+            backgroundColor: connectionData.map(d => d.color),
             borderRadius: 4,
           }],
         },
@@ -762,7 +808,7 @@
               beginAtZero: true,
               ticks: {
                 callback: function (value) {
-                  return value; // Direct numbers like 800, 700
+                  return value;
                 },
               },
             },
@@ -812,6 +858,16 @@
             },
           },
         },
+      });
+
+      // Connection Legend
+      const connectionLegend = document.getElementById('connectionLegend');
+      connectionLegend.innerHTML = '';
+      connectionData.forEach(item => {
+        const span = document.createElement('span');
+        span.innerHTML = `${item.label}: ${item.value}`;
+        span.style.setProperty('--legend-color', item.color);
+        connectionLegend.appendChild(span);
       });
     }
 
@@ -994,7 +1050,7 @@
       pagination.appendChild(nextBtn);
     }
 
-    // Sorting Top Risks table (overrides default criticality sort)
+    // Sorting Top Risks table
     function sortRiskTable(data, key, order, groupFilter, page) {
       let risks = data.filter(row => row.CVEs.critical > 0 || row.OS_release_name.includes('Windows 7'));
       if (groupFilter !== 'all') {
@@ -1171,54 +1227,45 @@
       return `${day}/${month}/${year} ${hours}:${minutes}`;
     }
 
-    // Exporting table as PDF with enhanced styling
+    // Exporting table as PDF with the specified layout
     function exportTableToPDF(data, groupFilter = 'all') {
       const { jsPDF } = window.jspdf;
       const doc = new jsPDF({
-        orientation: 'landscape', // Better for wide tables
+        orientation: 'landscape',
         unit: 'mm',
         format: 'a4',
       });
 
-      // Colors (matching dashboard)
-      const primaryColor = [30, 64, 175]; // #1e40af
-      const secondaryColor = [37, 99, 235]; // #2563eb
-      const accentColor = [220, 38, 38]; // #dc2626
-      const lightGray = [249, 250, 251]; // #f9fafb
-      const criticalBg = [254, 242, 242]; // #fef2f2
-      const highlightBg = [219, 234, 254]; // #dbeafe
+      const headerColor = [30, 64, 175]; // #1e40af
+      const borderColor = [37, 99, 235]; // #2563eb
+      const lightGray = [243, 244, 246]; // #f3f4f6
 
       // Header
-      doc.setFillColor(...primaryColor);
-      doc.rect(0, 0, 297, 20, 'F'); // Header background
+      doc.setFillColor(...headerColor);
+      doc.rect(0, 0, 297, 15, 'F');
       doc.setTextColor(255, 255, 255);
-      doc.setFontSize(16);
+      doc.setFontSize(14);
       doc.setFont('helvetica', 'bold');
-      doc.text('Relatório de Segurança de Endpoints', 14, 12);
+      doc.text('Relatório de Segurança de Endpoints', 14, 10);
       doc.setFontSize(10);
       doc.setFont('helvetica', 'normal');
-      doc.text(`Gerado em: ${getCurrentDate()}`, 260, 12, { align: 'right' });
-
-      // Logo placeholder (text-based)- [Logo Empresa]
-      doc.setTextColor(255, 255, 255);
-      doc.setFontSize(12);
-      doc.text('', 14, 8);
+      doc.text(`Gerado em: ${getCurrentDate()}`, 260, 10, { align: 'right' });
 
       // Divider
-      doc.setDrawColor(...secondaryColor);
+      doc.setDrawColor(...borderColor);
       doc.setLineWidth(0.5);
-      doc.line(14, 22, 283, 22);
+      doc.line(14, 16, 283, 16);
 
       // Summary Section
+      doc.setFontSize(12);
+      doc.setTextColor(31, 41, 55);
+      doc.setFont('helvetica', 'bold');
+      doc.text('Resumo', 14, 24);
+
       const totalEndpoints = data.length;
       const connected = data.filter(row => row.Connection).length;
       const criticalCVEs = aggregateCVEs(data).find(c => c.label === 'Crítico').value;
       const outdatedOS = data.filter(row => row.OS_release_name.includes('Windows 7')).length;
-
-      doc.setFontSize(12);
-      doc.setTextColor(31, 41, 55); // #1f2937
-      doc.setFont('helvetica', 'bold');
-      doc.text('Resumo', 14, 30);
 
       const summaryData = [
         ['Total de Endpoints', totalEndpoints],
@@ -1228,20 +1275,20 @@
       ];
 
       doc.autoTable({
-        startY: 34,
+        startY: 28,
         head: [['Métrica', 'Valor']],
         body: summaryData,
-        theme: 'plain',
+        theme: 'grid',
         styles: {
           font: 'helvetica',
           fontSize: 10,
           cellPadding: 2,
           textColor: [31, 41, 55],
-          lineColor: [229, 231, 235], // #e5e7eb
+          lineColor: [200, 200, 200],
           lineWidth: 0.1,
         },
         headStyles: {
-          fillColor: [229, 231, 235], // #e5e7eb
+          fillColor: [200, 200, 200],
           textColor: [31, 41, 55],
           fontSize: 11,
           fontStyle: 'bold',
@@ -1261,12 +1308,11 @@
 
       // Main Table Title
       let startY = doc.lastAutoTable.finalY + 10;
-      doc.setFontSize(14);
+      doc.setFontSize(12);
       doc.setTextColor(31, 41, 55);
       doc.setFont('helvetica', 'bold');
       doc.text('Detalhes dos Endpoints', 14, startY);
 
-      // Prepare table data
       let filteredData = groupFilter === 'all' ? data : data.filter(row => row.Group === groupFilter);
       filteredData = sortByCriticality(filteredData);
 
@@ -1283,7 +1329,6 @@
         row.Available_patches,
       ]);
 
-      // Main Table
       doc.autoTable({
         head: [headers],
         body: rows,
@@ -1294,12 +1339,12 @@
           fontSize: 9,
           cellPadding: 3,
           textColor: [31, 41, 55],
-          lineColor: [229, 231, 235],
+          lineColor: [200, 200, 200],
           lineWidth: 0.1,
           overflow: 'linebreak',
         },
         headStyles: {
-          fillColor: secondaryColor,
+          fillColor: borderColor,
           textColor: [255, 255, 255],
           fontSize: 10,
           fontStyle: 'bold',
@@ -1321,17 +1366,8 @@
           6: { cellWidth: 20, halign: 'center' },
         },
         didParseCell: (data) => {
-          if (data.section === 'body') {
-            const rowEndpoint = data.row.raw[0];
-            if (criticalEndpoints.has(rowEndpoint)) {
-              if (data.column.index === 0) {
-                data.cell.styles.fillColor = highlightBg;
-              } else if (data.column.index === 3) {
-                data.cell.styles.fillColor = criticalBg;
-              } else {
-                data.cell.styles.fillColor = highlightBg;
-              }
-            }
+          if (criticalEndpoints.has(data.cell.raw[0])) {
+            data.cell.styles.fillColor = [254, 242, 242];
           }
         },
         margin: { left: 14, right: 14 },
@@ -1342,7 +1378,7 @@
       for (let i = 1; i <= pageCount; i++) {
         doc.setPage(i);
         doc.setFontSize(8);
-        doc.setTextColor(107, 114, 128); // #6b7280
+        doc.setTextColor(107, 114, 128);
         doc.setFont('helvetica', 'normal');
         doc.text('xAI - Relatório de Segurança', 14, 205);
         doc.text(`Página ${i} de ${pageCount}`, 283, 205, { align: 'right' });
@@ -1423,8 +1459,7 @@
             });
             return obj;
           });
-          console.log('Raw XLSX Data:', rows);
-          currentData = processData(rows);
+          currentData = processData(rows, headers);
           currentPageEndpoints = 1;
           currentPageRisks = 1;
           currentPageInteresting = 1;
@@ -1465,46 +1500,32 @@
       renderInterestingTable(currentData, e.target.value, currentPageInteresting);
     });
 
+    // Sorting tables by clicking headers
+    document.querySelectorAll('table th').forEach(header => {
+      header.addEventListener('click', () => {
+        const tableId = header.closest('table').id;
+        const key = header.dataset.sort;
+        let order = header.classList.contains('asc') ? 'desc' : 'asc';
+        header.classList.remove('asc', 'desc');
+        header.classList.add(order);
+
+        if (tableId === 'endpointTable') {
+          sortTable(currentData, key, order, document.getElementById('groupFilter').value, currentPageEndpoints);
+        } else if (tableId === 'riskTable') {
+          sortRiskTable(currentData, key, order, document.getElementById('riskGroupFilter').value, currentPageRisks);
+        } else if (tableId === 'interestingTable') {
+          sortInterestingTable(currentData, key, order, document.getElementById('interestingGroupFilter').value, currentPageInteresting);
+        }
+      });
+    });
+
+    // Export button event listener
     document.getElementById('exportBtn').addEventListener('click', () => {
       exportTableToPDF(currentData, document.getElementById('groupFilter').value);
     });
 
-    document.querySelectorAll('#endpointTable th').forEach(th => {
-      th.addEventListener('click', () => {
-        const key = th.dataset.sort;
-        const order = th.dataset.order === 'asc' ? 'desc' : 'asc';
-        th.dataset.order = order;
-        sortTable(currentData, key, order, document.getElementById('groupFilter').value, currentPageEndpoints);
-      });
-    });
-
-    document.querySelectorAll('#riskTable th').forEach(th => {
-      th.addEventListener('click', () => {
-        const key = th.dataset.sort;
-        const order = th.dataset.order === 'asc' ? 'desc' : 'asc';
-        th.dataset.order = order;
-        sortRiskTable(currentData, key, order, document.getElementById('riskGroupFilter').value, currentPageRisks);
-      });
-    });
-
-    document.querySelectorAll('#interestingTable th').forEach(th => {
-      th.addEventListener('click', () => {
-        const key = th.dataset.sort;
-        const order = th.dataset.order === 'asc' ? 'desc' : 'asc';
-        th.dataset.order = order;
-        sortInterestingTable(currentData, key, order, document.getElementById('interestingGroupFilter').value, currentPageInteresting);
-      });
-    });
-
-    // Hide tooltip when mouse leaves canvas
-    document.querySelectorAll('canvas').forEach(canvas => {
-      canvas.addEventListener('mouseout', () => {
-        const tooltipEl = document.getElementById('chartjs-tooltip');
-        if (tooltipEl) {
-          tooltipEl.style.opacity = 0;
-        }
-      });
-    });
+    // Initial setup
+    showLoading('Aguardando upload de arquivo...');
   </script>
 </body>
 
